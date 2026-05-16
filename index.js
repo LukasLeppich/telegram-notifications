@@ -117,7 +117,7 @@ module.exports = function (app) {
         // Handle other types of errors
       }
     });
-    sendMessage('SignalK Telegram Bot started', 'init');
+    sendMessage('SignalK Telegram Bot started', 'init', true);
     app.setPluginStatus('Running');
   };
 
@@ -201,25 +201,27 @@ module.exports = function (app) {
     return newList
   }
 
-  function sendMessage(message, text) {
+  function sendMessage(message, text, disableNotification = false) {
     app.debug('Message: %s text: %s', message, text)
     if (message == "") {
       message = ("No info for " + text)
     }
     chatIds.forEach(chatid => {
       app.debug('Sending ' + chatid + ': ' + message);
-      bot.sendMessage(chatid, message, createChatButtons());
+      bot.sendMessage(chatid, message, createChatButtons(disableNotification));
     });
   }
 
-  function createChatButtons() {
+  function createChatButtons(disableNotification = false) {
+    /** @type {TelegramBot.SendMessageOptions} */
     const opts = {
+      disable_notification: disableNotification,
       reply_markup: {
         keyboard: [
           ['batt', 'wind', 'anchor'],
         ],
         resize_keyboard: true,
-        one_time_keyboard: true
+        one_time_keyboard: true,
       }
     };
     return opts;
