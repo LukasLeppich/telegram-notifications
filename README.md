@@ -3,6 +3,7 @@
 Subscribes to the `notifications.*` path in SignalK and sends updates to Telegram chats.
 
 Provide command to request ship data from Telegram bot:
+- info: Get all info
 - batt: Get battery status
 - wind: Get wind information
 - anchor: Get anchor information
