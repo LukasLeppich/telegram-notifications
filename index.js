@@ -118,11 +118,8 @@ module.exports = function (app) {
         // Handle other types of errors
       }
     });
-    sendMessage('SignalK Telegram Bot started', 'init', true);
     app.setPluginStatus('Running');
   };
-
-
 
   function elementName(element) {
     if (typeof element.name != 'undefined') {
