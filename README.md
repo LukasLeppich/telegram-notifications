@@ -6,6 +6,9 @@ Provide command to request ship data from Telegram bot:
 - batt: Get battery status
 - wind: Get wind information
 - anchor: Get anchor information
+- set: Set anchor: set 10 90 [max] (set 10 meters east of current position, optional max dist)
+- unset: Unset anchor
+- update: Update properties: update radius 10 (set max anchor radius to 10m) Properties: radius
 
 The commands only work when sent directly to the bot.
 You can use the buttons in other chats to trigger a command.

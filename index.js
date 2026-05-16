@@ -1,8 +1,9 @@
 /**
- * @import {ServerAPI, Plugin, Notification} from '@signalk/server-api'
+ * @import {ServerAPI, Plugin, Notification, Position, Delta} from '@signalk/server-api'
  * @import TelegramBot from '@types/node-telegram-bot-api'
  */
 process.env.NTBA_FIX_319 = 1; // or require('dotenv').config();
+const geolib = require('geolib');
 const TelegramBot = require('node-telegram-bot-api');
 const PLUGIN_ID = 'telegram-notifications';
 const PLUGIN_NAME = 'Telegram notifications';
@@ -21,12 +22,14 @@ module.exports = function (app) {
   plugin.name = PLUGIN_NAME;
   plugin.description = 'A plugin to send telegram notifications when an event occurs';
 
-
   /** @type {Command[]} */
   const commands = [
     { name: 'batt', description: 'Get battery status', execute: batteryCmd },
     { name: 'wind', description: 'Get wind information', execute: windCmd },
     { name: 'anchor', description: 'Get anchor information', execute: anchorCmd },
+    { name: 'set', description: 'Set anchor: set 10 90 [max] (set 10 meters east of current position, optional max dist)', execute: setAnchorCmd },
+    { name: 'unset', description: 'Unset anchor', execute: unsetAnchorCmd },
+    { name: 'update', description: 'Update properties: update radius 10 (set max anchor radius to 10m) Properties: radius', execute: updateCmd },
     { name: 'help', description: 'List available commands', execute: helpCmd }
   ];
 
@@ -169,7 +172,7 @@ module.exports = function (app) {
         return (value.toFixed(1) + 'v');
         break
       case 'A':
-        return (value + 'A');
+        return (value.toFixed(1) + 'A');
         break
       case 'm3':
         return ('liter: ' + (value * 1000).toFixed(0));
@@ -296,6 +299,8 @@ module.exports = function (app) {
       reply += elementToString(element.voltage, 'V');
       if (typeof element.power != "undefined") {
         reply += ", " + elementToString(element.power, 'watt');
+        element.power.value = element.power.value / 12;
+        reply += " (" + elementToString(element.power, 'A') + ")";
       }
       replies.push(reply);
     });
@@ -370,6 +375,74 @@ module.exports = function (app) {
     }
     return replies.join('\n');
   }
+  /** @type {CommandFn} */
+  function setAnchorCmd(input, app) {
+    if (typeof app == 'undefined') {
+      return input.startsWith('set');
+    }
+    const parts = input.split(' ');
+    if (parts.length < 3 || parts.length > 4) {
+      return 'Usage: set <distInMeter> <baringInDegree> [max]';
+    }
+    const distance = parseInt(parts[1]);
+    const bearing = parseInt(parts[2]);
+    let maxRadius;
+    if (parts.length > 3) {
+      maxRadius = parseInt(parts[3]);
+    } else {
+      maxRadius = Math.round(distance == 0 ? 5 : distance * 1.2);
+    }
+    const posValue = app.getSelfPath('navigation.position');
+    if (!posValue || posValue.value == null) {
+      return 'Current position not available';
+    }
+    const depthValue = app.getSelfPath("environment.depth.belowTransducer");
+    let depth = 0;
+    if (depthValue && depthValue.value != null) {
+      depth = depthValue.value;
+    }
+    /** @type {Position} */
+    const position = posValue.value;
+    const anchorPosition = geolib.computeDestinationPoint(position, distance, bearing);
+    anchorPosition.altitude = -depth;
+    app.putSelfPath('navigation.anchor.position', anchorPosition);
+    app.putSelfPath('navigation.anchor.maxRadius', maxRadius);
+    return 'Set anchor in ' + distance + 'm at bearing ' + bearing + '° (max radius: ' + maxRadius + 'm)\n' +
+      '  Long: ' + anchorPosition.longitude.toFixed(5) + '\n' +
+      '  Lat: ' + anchorPosition.latitude.toFixed(5) + '\n' +
+      '  Depth: ' + (anchorPosition.altitude.toFixed(1) * -1) + 'm';
+  }
+
+  /** @type {CommandFn} */
+  function updateCmd(input, app) {
+    if (typeof app == 'undefined') {
+      return input.startsWith('update');
+    }
+    const parts = input.split(' ');
+    if (parts.length != 3) {
+      return 'Usage: update <property> <value>';
+    }
+    const property = parts[1].toLowerCase();
+    const value = parts[2];
+    switch (property) {
+      case 'radius':
+        const radius = parseInt(value);
+        app.putSelfPath('navigation.anchor.maxRadius', radius);
+        return 'Updated max anchor radius to ' + radius + 'm';
+      default:
+        return 'Unknown property: ' + property;
+    }
+  }
+
+  /** @type {CommandFn} */
+  function unsetAnchorCmd(input, app) {
+    if (typeof app == 'undefined') {
+      return input.startsWith('unset');
+    }
+    app.putSelfPath('navigation.anchor.position', null);
+    return 'Anchor unset';
+  }
+
 
   function helpCmd(input, app) {
     if (typeof app == 'undefined') {

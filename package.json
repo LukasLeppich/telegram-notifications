@@ -8,6 +8,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "geolib": "^3.3.14",
     "node-telegram-bot-api": "^0.67.0"
   },
   "devDependencies": {
