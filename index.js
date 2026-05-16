@@ -24,6 +24,7 @@ module.exports = function (app) {
 
   /** @type {Command[]} */
   const commands = [
+    { name: 'info', description: 'Get all info', execute: infoCmd },
     { name: 'batt', description: 'Get battery status', execute: batteryCmd },
     { name: 'wind', description: 'Get wind information', execute: windCmd },
     { name: 'anchor', description: 'Get anchor information', execute: anchorCmd },
@@ -218,7 +219,7 @@ module.exports = function (app) {
       disable_notification: disableNotification,
       reply_markup: {
         keyboard: [
-          ['batt', 'wind', 'anchor'],
+          ['info', 'help'],
         ],
         resize_keyboard: true,
         one_time_keyboard: true,
@@ -280,6 +281,24 @@ module.exports = function (app) {
   /**
    * @typedef {(command: string, app: ServerAPI|undefined) => string|boolean} CommandFn
    */
+
+  function infoCmd(input, app) {
+    if (typeof app == 'undefined') {
+      return input.startsWith('info');
+    }
+    let reply = 'Vessel information:\n';
+    reply += "Battery: \n"
+    reply += indentLines(batteryCmd(input, app), 2) + '\n';
+    reply += "Wind: \n"
+    reply += indentLines(windCmd(input, app), 2) + '\n';
+    reply += "Anchor: \n"
+    reply += indentLines(anchorCmd(input, app), 2) + '\n';
+    return reply;
+  }
+  function indentLines(text, spaces) {
+    const indent = ' '.repeat(spaces);
+    return text.split('\n').map(line => indent + line).join('\n');
+  }
 
   /** 
    * @type {CommandFn}
