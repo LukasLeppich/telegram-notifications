@@ -21,6 +21,15 @@ module.exports = function (app) {
   plugin.name = PLUGIN_NAME;
   plugin.description = 'A plugin to send telegram notifications when an event occurs';
 
+
+  /** @type {Command[]} */
+  const commands = [
+    { name: 'batt', description: 'Get battery status', execute: batteryCmd },
+    { name: 'wind', description: 'Get wind information', execute: windCmd },
+    { name: 'anchor', description: 'Get anchor information', execute: anchorCmd },
+    { name: 'help', description: 'List available commands', execute: helpCmd }
+  ];
+
   plugin.start = function (options, restartPlugin) {
     plugin.options = options;
     chatIds = options.chatids;
@@ -72,165 +81,27 @@ module.exports = function (app) {
       }
     );
 
+
     bot.on('message', (msg) => {
-      let chatId = msg.chat.id;
-      globalChatId = chatId;
-      let text = msg.text.toLowerCase();
-      app.debug('Message: ' + JSON.stringify(msg));
-      app.debug('Options: ' + JSON.stringify(options));
-      var reply = '';
-
-      if (text == 'temp') {
-        var element;
+      const command = msg.text.toLowerCase();
+      const toExecute = commands.filter(cmd => cmd.execute(command, undefined));
+      if (toExecute.length == 0) {
+        sendMessage('Unknown command: ' + command +
+          helpCmd('help', app) +
+          "\n\nChat id: " + msg.chat.id,
+          command);
+        return;
+      }
+      toExecute.forEach(cmd => {
         try {
-          element = app.getSelfPath('environment.outside.temperature');
-          app.debug('Temp: ' + JSON.stringify(element));
-          reply += 'Outside ' + elementToString(element);
-        } catch (e) { }
-        try {
-          element = app.getSelfPath('environment.inside.hutachterstuurboord.temperature');
-          app.debug('Temp: ' + JSON.stringify(element));
-          reply += ', hut acher sb ' + elementToString(element);
-        } catch (e) { }
-        try {
-          element = app.getSelfPath('environment.inside.hutachterbakboord.temperature');
-          app.debug('Temp: ' + JSON.stringify(element));
-          reply += ', hut achter bb ' + elementToString(element);
-        } catch (e) { }
-        try {
-          element = app.getSelfPath('environment.inside.hutvoor.temperature');
-          app.debug('Temp: ' + JSON.stringify(element));
-          reply += ', hut voor ' + elementToString(element);
-        } catch (e) { }
-        try {
-          element = app.getSelfPath('environment.inside.fridge.temperature');
-          app.debug('Temp: ' + JSON.stringify(element));
-          reply += ', fridge ' + elementToString(element);
-        } catch (e) { }
-        try {
-          element = app.getSelfPath('environment.water.temperature');
-          app.debug('Temp: ' + JSON.stringify(element));
-          reply += ', water ' + elementToString(element);
-        } catch (e) { }
-      } else
-        if (text == 'humidity') {
-          var element;
-          try {
-            element = app.getSelfPath('environment.outside.humidity');
-            app.debug('Humidity: ' + JSON.stringify(element));
-            reply += 'Outside ' + elementToString(element);
-          } catch (e) { }
-          try {
-            element = app.getSelfPath('environment.inside.fridge.humidity');
-            app.debug('Humidity: ' + JSON.stringify(element));
-            reply += ', fridge ' + elementToString(element);
-          } catch (e) { }
-          try {
-            element = app.getSelfPath('environment.inside.hutvoor.humidity');
-            app.debug('Humidity: ' + JSON.stringify(element));
-            reply += ', hut voor ' + elementToString(element);
-          } catch (e) { }
-          try {
-            element = app.getSelfPath('environment.inside.hutachterbakboord.humidity');
-            app.debug('Humidity: ' + JSON.stringify(element));
-            reply += ', hut bakboord ' + elementToString(element);
-          } catch (e) { }
-          try {
-            element = app.getSelfPath('environment.inside.hutachterstuurboord.humidity');
-            app.debug('Humidity: ' + JSON.stringify(element));
-            reply += ', hut stuurboord ' + elementToString(element);
-          } catch (e) { }
-        } else
-          if (text == 'buddy') {
-            const buddies = app.getSelfPath('notifications.buddy');
-            if (typeof buddies != 'undefined') {
-              Object.values(buddies).forEach(buddy => {
-                reply += buddy.value.message.replace(/Your buddy /, '') + '\n';
-              });
-            } else {
-              reply += 'No buddies nearby\n';
-            }
-          } else
-            if (text == 'starlink') {
-              element = app.getSelfPath('electrical.switches.starlink.state');
-              app.debug('Starlink: ' + JSON.stringify(element));
-              onoff = elementToString(element)
-              reply += "Starlink power: " + onoff
-              if (onoff == "on") {
-                element = app.getSelfPath('network.providers.starlink.status');
-                app.debug('Starlink network status: ' + JSON.stringify(element));
-              }
-            } else
-              if (text == 'batt') {
-                Object.values(app.getSelfPath('electrical.batteries')).forEach(element => {
-                  app.debug('Batt: ' + JSON.stringify(element));
-                  var prefix = elementName(element) + 'battery ';
-                  if (typeof element.capacity.stateOfCharge != 'undefined') {
-                    reply += prefix + elementToString(element.capacity.stateOfCharge, 'stateOfCharge') + ', ' + elementToString(element.voltage) + '\n';
-                  } else {
-                    reply += prefix + elementToString(element.voltage) + '\n';
-                  }
-                });
-              } else
-                if (text == 'tank') {
-                  Object.values(app.getSelfPath('tanks.freshWater')).forEach(element => {
-                    app.debug('Tank: ' + JSON.stringify(element));
-                    var prefix = elementName(element) + '(' + element.type.value + ') tank ';
-                    reply += prefix + elementToString(element.currentLevel) + ', ' + elementToString(element.currentVolume) + '\n';
-                  });
-                  Object.values(app.getSelfPath('tanks.fuel')).forEach(element => {
-                    app.debug('Tank: ' + JSON.stringify(element));
-                    var prefix = elementName(element) + '(' + element.type.value + ') tank ';
-                    reply += prefix + elementToString(element.currentLevel) + ', ' + elementToString(element.currentVolume) + '\n';
-                  });
-                  Object.values(app.getSelfPath('tanks.wasteWater')).forEach(element => {
-                    app.debug('Tank: ' + JSON.stringify(element));
-                    var prefix = elementName(element) + '(' + element.type.value + ') tank ';
-                    reply += prefix + elementToString(element.currentLevel) + ', ' + elementToString(element.currentVolume) + '\n';
-                  });
-                } else
-                  if (text == 'solar') {
-                    for (const [name, element] of Object.entries(app.getSelfPath('electrical.solar'))) {
-                      app.debug('Name: ' + name + ' element: ' + JSON.stringify(element));
-                      reply += name + ': ' + elementToString(element.current) + ', power: ' + elementToString(element.panelPower, 'watt') + ', charging mode: ' + element.chargingMode.value + '\n';
-                    }
-                  } else
-                    if (text == 'wind') {
-                      var windDirection
-                      var windType
-                      try {
-                        windDirection = app.getSelfPath('environment.wind.directionTrue')
-                        windType = 'direction True ground'
-                      }
-                      catch (e) {
-                        windDirection = app.getSelfPath('environment.wind.angleTrueWater')
-                        windType = 'angle True water'
-                      }
-                      finally {
-                        app.debug("Can't get wind angle")
-                      }
-
-                      windDirection['meta']['units'] = 'rad'
-                      var windSpeed = app.getSelfPath('environment.wind.speedOverGround')
-                      reply += 'Wind ' + windType + ': ' + elementToString(windDirection) + ', ' + elementToString(windSpeed) + '\n';
-                    } else
-                      if (text == 'depth') {
-                        reply += 'Depth: ' + elementToString(app.getSelfPath('environment.depth.belowTransducer')) + '\n';
-                      } else {
-                        reply += 'Use this chatId in SignalK: ' + chatId + '\n \
-        Temp - Inside temperature\n \
-        Tank - Tank information\n \
-        Batt - battery states\n \
-        Solar - Solar state\n \
-        Wind - Wind information\n \
-        Humidity - Humidity information\n \
-        Depth - Depth information\n \
-        Buddy - Nearby buddies\n \
-        Starlink - Starlink status';
-                      }
-
-      sendMessage(reply, text);
-      //type other code here
+          let reply = cmd.execute(command, app);
+          sendMessage(reply, msg.text);
+        } catch (error) {
+          const errMsg = 'Error occurred while executing command [' + command + ']:' + error.message
+          app.error(errMsg, error);
+          sendMessage(errMsg + "\nERROR: \n", JSON.stringify(error, null, 2), msg.text);
+        }
+      });
     });
     bot.on('polling_error', (error) => {
       app.error('Polling error occurred:', error);
@@ -243,6 +114,7 @@ module.exports = function (app) {
         // Handle other types of errors
       }
     });
+    sendMessage('SignalK Telegram Bot started', 'init');
     app.setPluginStatus('Running');
   };
 
@@ -260,10 +132,11 @@ module.exports = function (app) {
 
   function elementToString(object, type) {
     app.debug('type: ' + type + ' object: ' + JSON.stringify(object));
-    var units = object.meta.units;
+    var unis = object.meta.units;
     if (typeof type != 'undefined') {
       units = type
     }
+    /** @type {number} */
     var value = object.value;
     if (typeof type == 'undefined' && (value == 0 || value == 1)) {
       units = 'bool'
@@ -275,7 +148,7 @@ module.exports = function (app) {
         return ((value - 273.15).toFixed(1) + '°C');
         break
       case 'rad':
-        return ((value * 57.2958).toFixed(0) + '°T');
+        return ((value * 57.2958).toFixed(0) + '°');
         break
       case 'm/s':
         return ((value * 1.94384).toFixed(1) + 'kn');
@@ -302,7 +175,7 @@ module.exports = function (app) {
         return ('liter: ' + (value * 1000).toFixed(0));
         break
       case 'watt':
-        return (value + ' Watt');
+        return (value.toFixed(2) + ' Watt');
         break
       case 'chargingMode':
         return ('charging mode: ' + value);
@@ -332,8 +205,21 @@ module.exports = function (app) {
     }
     chatIds.forEach(chatid => {
       app.debug('Sending ' + chatid + ': ' + message);
-      bot.sendMessage(chatid, message);
+      bot.sendMessage(chatid, message, createChatButtons());
     });
+  }
+
+  function createChatButtons() {
+    const opts = {
+      reply_markup: {
+        keyboard: [
+          ['batt', 'wind', 'anchor'],
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true
+      }
+    };
+    return opts;
   }
 
   plugin.stop = function () {
@@ -378,5 +264,119 @@ module.exports = function (app) {
     }
   };
 
+
+  /**
+   * @typedef {Object} Command
+   * @property {string} name - The name of the command
+   * @property {string} description - A description of the command
+   * @property {CommandFn} execute - The function to execute when the command is called
+   */
+
+  /**
+   * @typedef {(command: string, app: ServerAPI|undefined) => string|boolean} CommandFn
+   */
+
+  /** 
+   * @type {CommandFn}
+   */
+  function batteryCmd(input, app) {
+    if (typeof app == 'undefined') {
+      return input.startsWith('batt');
+    }
+    const batteries = app.getSelfPath('electrical.batteries');
+    if (!batteries) {
+      return "Battery information not available";
+    }
+    const replies = [];
+    Object.entries(batteries).forEach(([key, element]) => {
+      let reply = key + ': ';
+      if (typeof element.capacity.stateOfCharge != 'undefined') {
+        reply += elementToString(element.capacity.stateOfCharge, 'stateOfCharge') + ", ";
+      }
+      reply += elementToString(element.voltage, 'V');
+      if (typeof element.power != "undefined") {
+        reply += ", " + elementToString(element.power, 'watt');
+      }
+      replies.push(reply);
+    });
+    if (replies.length == 0) {
+      return 'No battery information available';
+    }
+    return replies.join('\n');
+  }
+
+  /** @type {CommandFn} */
+  function windCmd(input, app) {
+    if (typeof app == 'undefined') {
+      return input.startsWith('wind');
+    }
+    const windData = app.getSelfPath('environment.wind');
+    const replies = [];
+    Object.entries(windData).forEach(([key, element]) => {
+      let reply = "";
+      switch (key) {
+        case 'directionTrue':
+          reply += 'True wind direction: ' + elementToString(element, 'rad');
+          break;
+        case 'angleApparent':
+          reply += 'Apparent wind direction: ' + elementToString(element, 'rad');
+          break;
+        case 'speedApparent':
+          reply += 'Apparent wind speed: ' + elementToString(element, 'm/s');
+          break;
+        default:
+          reply += key + ': ' + elementToString(element);
+      }
+      replies.push(reply);
+    });
+    if (replies.length == 0) {
+      return 'No wind information available';
+    }
+    return replies.join('\n');
+  }
+
+  /** @type {CommandFn} */
+  function anchorCmd(input, app) {
+    if (typeof app == 'undefined') {
+      return input.startsWith('anchor');
+    }
+    let replies = [];
+    const anchorPosition = app.getSelfPath('navigation.anchor.position');
+    if (!anchorPosition || anchorPosition.value == null) {
+      return 'Anchor is not set';
+    }
+    const anchorData = app.getSelfPath('navigation.anchor');
+    Object.entries(anchorData).forEach(([key, element]) => {
+      switch (key) {
+        case "currentRadius":
+          replies.push("Current distance: " + elementToString(element, 'm'));
+          break;
+        case "maxRadius":
+          replies.push("Max distance: " + elementToString(element, 'm'));
+          break;
+        case "bearingTrue":
+          replies.push("Bearing: " + elementToString(element, 'rad'));
+          break;
+      }
+    });
+    /** @type {Notification} */
+    const anchorState = app.getSelfPath('notifications.navigation.anchor');
+    if (anchorState) {
+      replies.push("Anchor state: " +
+        anchorState.value.state.toUpperCase() + ' - ' + anchorState.value.message);
+    }
+    if (replies.length == 0) {
+      return 'No anchor information available';
+    }
+    return replies.join('\n');
+  }
+
+  function helpCmd(input, app) {
+    if (typeof app == 'undefined') {
+      return input.startsWith('help');
+    }
+    return 'Available commands: \n' +
+      commands.map(cmd => "  " + cmd.name + " - " + cmd.description).join('\n');
+  }
   return plugin;
 };
