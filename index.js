@@ -59,7 +59,6 @@ module.exports = function (app) {
       },
       delta => {
         delta.updates.forEach(update => {
-          app.debug('u: ' + JSON.stringify(update));
           let messages = [];
           update.values.forEach(v => {
             let path = v.path;
@@ -133,7 +132,7 @@ module.exports = function (app) {
 
   function elementToString(object, type) {
     app.debug('type: ' + type + ' object: ' + JSON.stringify(object));
-    var unis = object.meta.units;
+    var units = object?.meta?.units || '';
     if (typeof type != 'undefined') {
       units = type
     }
