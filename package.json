@@ -1,6 +1,6 @@
 {
   "name": "telegram-notifications",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "simple package to send telegram notifications when an event is triggered",
   "main": "index.js",
   "keywords": [
